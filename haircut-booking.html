@@ -111,13 +111,18 @@ function fl(k){var d=dd(k);return DN[d.getDay()]+', '+d.getDate()+' '+MN[d.getMo
 function rub(n){return n.toLocaleString('ru-RU')+' ₽'}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function hash(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)}
-function slots(){var a=[];for(var h=10;h<21;h++){a.push(h+':00');if(h<20)a.push(h+':30')}return a}
-function busy(k,t,b){for(var i=0;i<L.length;i++){var r=L[i];if(r.dt===k&&r.tm===t&&r.br===b)return true}return hash(k+t+b)%100<28}
-function past(k,t){var n=new Date();if(k!==iso(n))return false;var p=t.split(':');return +p[0]*60+ +p[1]<=n.getHours()*60+n.getMinutes()+30}
-function free(b,k,t){return !busy(k,t,b)&&!past(k,t)}
+var OPEN=600,CLOSE=1260,STEP=30;
+function mins(t){var p=t.split(':');return +p[0]*60+ +p[1]}
+function hm(n){return Math.floor(n/60)+':'+pad(n%60)}
+function slots(){var a=[];for(var n=OPEN;n<CLOSE;n+=STEP)a.push(hm(n));return a}
+function dur(){var s=sv(S.sv);return s?s.min:STEP}
+function busy(k,n,b){for(var i=0;i<L.length;i++){var r=L[i],a=mins(r.tm);if(r.dt===k&&r.br===b&&n>=a&&n<a+sv(r.sv).min)return true}return hash(k+hm(n)+b)%100<22}
+function past(k,t){var n=new Date();if(k!==iso(n))return false;return mins(t)<=n.getHours()*60+n.getMinutes()+30}
+function free(b,k,t,d){var a=mins(t);d=d||dur();if(a+d>CLOSE||past(k,t))return false;for(var n=a;n<a+d;n+=STEP)if(busy(k,n,b))return false;return true}
+function upcoming(r){var n=new Date();return r.dt>iso(n)||(r.dt===iso(n)&&mins(r.tm)+sv(r.sv).min>n.getHours()*60+n.getMinutes())}
 function days(){var n=new Date(),a=[];for(var i=0;i<14;i++)a.push(new Date(n.getFullYear(),n.getMonth(),n.getDate()+i));return a}
 function nextFree(b){var d=days(),a=slots();for(var i=0;i<d.length;i++){var k=iso(d[i]);for(var j=0;j<a.length;j++)if(free(b,k,a[j]))return (i===0?'сегодня':i===1?'завтра':fl(k))+', '+a[j]}return 'мест нет'}
-function can(){if(S.st===0)return !!S.sv;if(S.st===1)return !!S.br;if(S.st===2)return !!(S.dt&&S.tm);return S.nm.trim().length>1&&S.ph.replace(/[^0-9]/g,'').length>=10}
+function can(){if(S.st===0)return !!S.sv;if(S.st===1)return !!S.br;if(S.st===2)return !!(S.dt&&S.tm&&free(S.br,S.dt,S.tm));return S.nm.trim().length>1&&S.ph.replace(/[^0-9]/g,'').length>=10}
 function row(a,v,on,l,r){return `<button class='row' data-a='${a}' data-v='${v}' aria-pressed='${on}'>${l}${r}</button>`}
 function sl(a,b,c){return `<div class='sl ${c||''}'><span>${a}</span><b>${b}</b></div>`}
 function rBook(){var h=`<div class='sb'>${S.st>0?`<button class='bk' data-a='back'>${CHV}Назад</button>`:'<span></span>'}<span>Шаг ${S.st+1} из 4</span></div>`;
@@ -129,12 +134,16 @@ else[['Утро',10,13],['День',13,17],['Вечер',17,21]].forEach(functio
 else{var s=sv(S.sv);h+=`<h1 class='t'>Почти готово</h1><p class='lead'>Оставьте контакты, чтобы мастер мог связаться, если планы изменятся.</p><label class='f'>Имя<input id='nm' autocomplete='name' placeholder='Как к вам обращаться' value='${esc(S.nm)}'></label><label class='f'>Телефон<input id='ph' type='tel' autocomplete='tel' placeholder='+7 900 000-00-00' value='${esc(S.ph)}'></label><div class='sum'>${sl('Услуга',s.n)}${sl('Мастер',br(S.br).n)}${sl('Когда',fl(S.dt)+', '+S.tm)}${sl('Длительность',s.min+' мин')}${sl('Итого',rub(s.p),'tot')}</div>`}
 return h}
 function rMine(){var a=L.slice().sort(function(x,y){return (x.dt+x.tm)<(y.dt+y.tm)?-1:1});if(!a.length)return `<h1 class='t'>Записей пока нет</h1><p class='lead'>Здесь появятся ваши визиты.</p><button class='btn' data-a='go'>Записаться</button>`;
-var h=`<h1 class='t'>Мои записи</h1><p class='lead'>После отмены время сразу освобождается.</p>`;a.forEach(function(r){h+=`<div class='row' style='cursor:default'><div class='grow'><div class='nm'>${fl(r.dt)}, ${r.tm}</div><div class='ds'>${sv(r.sv).n}, ${br(r.br).n}</div></div><button class='lk' data-a='cx' data-v='${r.id}'>${S.cf===r.id?'Точно отменить?':'Отменить'}</button></div>`});return h}
+var u=a.filter(upcoming),o=a.filter(function(r){return !upcoming(r)}).reverse();
+function it(r,x){return `<div class='row' style='cursor:default${x?'':';opacity:.6'}'><div class='grow'><div class='nm'>${fl(r.dt)}, ${r.tm}</div><div class='ds'>${sv(r.sv).n}, ${br(r.br).n}</div></div>${x?`<button class='lk' data-a='cx' data-v='${r.id}'>${S.cf===r.id?'Точно отменить?':'Отменить'}</button>`:''}</div>`}
+var h=`<h1 class='t'>Мои записи</h1><p class='lead'>${u.length?'После отмены время сразу освобождается.':'Предстоящих визитов нет.'}</p>`;u.forEach(function(r){h+=it(r,1)});
+if(!u.length)h+=`<button class='btn' data-a='go' style='margin-bottom:8px'>Записаться</button>`;
+if(o.length){h+=`<p class='grp'>Прошедшие</p>`;o.forEach(function(r){h+=it(r,0)})}return h}
 function rDone(){var r=S.dn,s=sv(r.sv);return `<div class='ok'>${CHK}</div><h1 class='t' style='margin-top:16px'>Вы записаны</h1><p class='lead'>Ждём вас, ${esc(r.nm)}. Запись сохранена в разделе «Мои записи».</p><div class='tk'><div class='hd'><div><div class='no'>№ ${String(r.id).slice(-4)}</div><div class='when'>${r.tm}</div><div class='dt'>${fl(r.dt)}</div></div><div class='price'>${rub(s.p)}<small>${s.min} мин</small></div></div><div class='perf'></div><div class='bd'>${sl('Услуга',s.n)}${sl('Мастер',br(r.br).n)}</div></div><div class='acts'><button class='btn' data-a='ics'>Добавить в календарь</button><button class='btn ghost' data-a='new'>Новая запись</button></div>`}
 function rBar(){var b=g('bar');if(S.v!=='book'||S.dn){b.hidden=true;return}b.hidden=false;var s=sv(S.sv),ok=can();
 g('bi').innerHTML=s?`<b>${rub(s.p)}</b><span>${ok?s.min+' мин'+(S.tm?', '+fl(S.dt)+' в '+S.tm:''):HINT[S.st]}</span>`:`<span>${HINT[0]}</span>`;
 var o=g('go');o.textContent=S.st===3?'Записаться':'Дальше';o.disabled=!ok}
-function render(){g('mine').textContent=S.v==='mine'?'Новая запись':'Мои записи'+(L.length?' ('+L.length+')':'');
+function render(){var N=L.filter(upcoming).length;g('mine').textContent=S.v==='mine'?'Новая запись':'Мои записи'+(N?' ('+N+')':'');
 g('pi').style.width=(S.dn?100:(S.st+1)*25)+'%';g('pole').style.visibility=S.v==='mine'?'hidden':'visible';
 g('m').innerHTML=`<div class='v'>${S.v==='mine'?rMine():S.dn?rDone():rBook()}</div>`;rBar()}
 function save(){try{localStorage.setItem('bc_l',JSON.stringify(L))}catch(e){}}
@@ -144,7 +153,7 @@ function ics(r){var s=sv(r.sv),a=new Date(r.dt+'T'+r.tm+':00'),e=new Date(a.getT
 var t=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Barber Club//RU','BEGIN:VEVENT','UID:'+r.id+'@barberclub','DTSTAMP:'+f(new Date()),'DTSTART:'+f(a),'DTEND:'+f(e),'SUMMARY:'+s.n+', '+br(r.br).n,'END:VEVENT','END:VCALENDAR'].join('\r\n');
 var l=document.createElement('a');l.href=URL.createObjectURL(new Blob([t],{type:'text/calendar'}));l.download='barber-club.ics';document.body.appendChild(l);l.click();l.remove()}
 document.addEventListener('click',function(e){var t=e.target.closest('[data-a]');if(!t)return;var a=t.dataset.a,v=t.dataset.v,nav=false;
-if(a==='sv')S.sv=+v;else if(a==='br'){S.br=+v;S.tm=''}else if(a==='dt'){S.dt=v;S.tm=''}else if(a==='tm')S.tm=v;
+if(a==='sv'){S.sv=+v;if(S.tm&&!free(S.br,S.dt,S.tm))S.tm=''}else if(a==='br'){S.br=+v;S.tm=''}else if(a==='dt'){S.dt=v;S.tm=''}else if(a==='tm')S.tm=v;
 else if(a==='next'){if(!can())return;nav=true;if(S.st<3)S.st++;else book()}
 else if(a==='back'){S.st--;nav=true}
 else if(a==='mine'){S.v=S.v==='mine'?'book':'mine';S.cf=0;nav=true;if(S.v==='book'&&S.dn){S.dn=null;S.st=0;S.sv=S.br=0;S.dt=S.tm=''}}
