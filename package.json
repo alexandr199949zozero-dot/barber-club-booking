@@ -1,0 +1,11 @@
+{
+  "name": "barber-club-booking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Онлайн-запись для барбершопа: сайт записи, админка, уведомления в Telegram",
+  "scripts": {
+    "dev": "node server.js",
+    "test": "node test/run.js"
+  },
+  "engines": { "node": ">=18" }
+}
